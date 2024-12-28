@@ -60,23 +60,31 @@ def extract_information(html_content, contacts, mission_sentences, keyword_count
     soup = BeautifulSoup(html_content, 'html.parser')
     text = soup.get_text(separator=' ')  # 提取纯文本，并用空格分隔
 
-    # 提取邮箱
-    email_pattern = r'\b[\w.-]+?@[\w.-]+?\.\w+\b'
+     # 提取有效邮箱
+    email_pattern = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b'
     emails = re.findall(email_pattern, text)
-    contacts["emails"].update(emails)
+    valid_emails = [email for email in emails if not any(char in email for char in ['?', '0', '_'])]
+    contacts["emails"].update(valid_emails)
 
-    # 提取电话号码
-    phone_pattern = r'\b(?:\+?1[-.\s]?)?(?:\(?\d{3}\)?[-.\s]?)?\d{3}[-.\s]?\d{4}\b'
+    # 提取有效电话号码
+    phone_pattern = r'\b(?:\+?\d{1,3})?[-.\s]?(?:\(?\d{1,4}\)?[-.\s]?)?\d{1,4}[-.\s]?\d{1,4}[-.\s]?\d{1,9}\b'
     phones = re.findall(phone_pattern, text)
-    contacts["phones"].update(phones)
+    valid_phones = [phone for phone in phones if re.match(r'\d', phone) and len(phone.replace("-", "").replace(" ", "")) >= 7]
+    contacts["phones"].update(valid_phones)
 
-    # 提取包含 “mission” 的句子
+ # 提取包含 “mission” 的句子
     mission_pattern = r'[^.!?]*\bmission\b[^.!?]*[.!?]'
     mission_matches = re.findall(mission_pattern, text, flags=re.I)
     valid_mission_sentences = [
         sentence.strip() for sentence in mission_matches if filter_valid_sentence(sentence)
     ]
-    mission_sentences.extend(sorted(valid_mission_sentences, key=len)[:2])  # 只取两句最短的
+    
+    # 限制总的 mission_sentences 数量为 3
+    for sentence in sorted(valid_mission_sentences, key=len):
+        if len(mission_sentences) < 3:  # 控制总数量
+            mission_sentences.append(sentence.strip())
+        else:
+            break
 
     # 对文本内容进行关键词计数
     for sentence in text.split('.'):
